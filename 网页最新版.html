@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>税务服务 - 个税+小规模计算器</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
@@ -491,6 +492,26 @@
         margin: 15px 0;
         border-left: 3px solid #9d4edd;
       }
+      /* 支付弹窗特定样式 */
+#payModal .modal-content {
+  max-width: 420px !important;
+}
+
+#finalTaxAmount {
+  background: rgba(255, 215, 0, 0.1);
+  border-color: #ffd700;
+  color: #ffd700;
+  font-weight: bold;
+  text-align: center;
+}
+
+#payRes {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: bold;
+  display: none;
+}
     </style>
 </head>
 <body>
@@ -560,6 +581,12 @@
           <div class="result-item"><span>应缴增值税：</span><strong id="vat">0.00 元</strong></div>
           <div class="result-item"><span>附加税费合计：</span><strong id="addTax">0.00 元</strong></div>
           <div class="result-item"><span>税费总计：</span><strong id="totalTax">0.00 元</strong></div>
+          <div style="text-align:center;margin-top:20px;">
+  <button class="calc-btn" id="applyTaxPersonal"
+          style="background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);">
+    💳 申请缴税
+  </button>
+</div>
         </div>
       </div>
     </div>
@@ -603,6 +630,11 @@
           <div class="result-item"><span>累计应缴个税：</span><strong id="totalTaxIncome">0.00 元</strong></div>
           <div class="result-item"><span>本月应预扣预缴个税：</span><strong id="monthlyTax">0.00 元</strong></div>
           <div class="result-item"><span>税后月收入：</span><strong id="afterTaxIncome">0.00 元</strong></div>
+          <div style="text-align:center;margin-top:20px;">
+          <button class="calc-btn" id="applyTaxPersonal" style="background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);">
+          💳 申请缴税
+          </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1477,6 +1509,30 @@
         </div>
       </div>
     </div>
+    <!-- 缴税确认弹窗 -->
+<div class="modal" id="payModal">
+  <div class="modal-content" style="max-width:420px;">
+    <button class="modal-close" id="payClose">×</button>
+    <h2>💳 缴税确认</h2>
+
+    <div class="form-group">
+      <label>税费总计（元）</label>
+      <input type="text" id="finalTaxAmount" readonly>
+    </div>
+    <div class="form-group">
+      <label>账号</label>
+      <input type="text" id="payAccount" placeholder="请输入账号">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="payPassword" placeholder="请输入密码">
+    </div>
+
+    <button class="calc-btn" id="paySubmit">支付税款</button>
+
+    <!-- 支付结果 -->
+    <div id="payRes" style="margin-top:15px;text-align:center;font-weight:bold;display:none;"></div>
+  </div>
 
     <!-- JS代码 -->
     <script>
@@ -1775,6 +1831,235 @@
               if (e.target === personalTaxModal) personalTaxModal.style.display = 'none';
           };
       }
+     // ==================== 支付功能绑定（从Excel读取账号密码） ====================
+
+// Excel文件路径（确保文件存在且可访问）
+const EXCEL_FILE_PATH = 'accounts.xlsx';
+
+// 账号密码映射表
+let accountsMap = new Map();
+
+// 加载Excel中的账号密码
+async function loadAccountsFromExcel() {
+    try {
+        // 使用SheetJS读取Excel文件
+        const response = await fetch(EXCEL_FILE_PATH);
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        
+        // 获取第一个工作表
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        // 转换为JSON数组
+        const data = XLSX.utils.sheet_to_json(worksheet);
+        
+        // 将数据存入Map（假设Excel有username和password两列）
+        data.forEach(row => {
+            const username = String(row.username || row.账号 || row.用户 || row.user).trim();
+            const password = String(row.password || row.密码 || row.pwd).trim();
+            if (username && password) {
+                accountsMap.set(username, password);
+            }
+        });
+        
+        console.log(`成功加载 ${accountsMap.size} 条账号记录`);
+        return true;
+    } catch (error) {
+        console.error('加载Excel文件失败:', error);
+        // 如果Excel文件不存在，使用默认账号
+        setDefaultAccounts();
+        return false;
+    }
+}
+
+// 设置默认账号（备用）
+function setDefaultAccounts() {
+    accountsMap.set('user001', '123456');
+    accountsMap.set('user002', '654321');
+    accountsMap.set('admin', 'admin123');
+    console.log('使用默认账号密码');
+}
+
+// 验证账号密码
+function validateAccount(username, password) {
+    const storedPassword = accountsMap.get(username);
+    return storedPassword === password;
+}
+
+// 打开支付弹窗
+function openPayModal(taxAmount) {
+    const payModal = document.getElementById('payModal');
+    const finalTaxAmount = document.getElementById('finalTaxAmount');
+    const payRes = document.getElementById('payRes');
+    
+    // 设置税费金额
+    finalTaxAmount.value = taxAmount;
+    
+    // 清空输入框和结果
+    document.getElementById('payAccount').value = '';
+    document.getElementById('payPassword').value = '';
+    payRes.style.display = 'none';
+    payRes.textContent = '';
+    
+    // 显示弹窗
+    payModal.style.display = 'flex';
+}
+
+// 初始化支付功能
+async function initPayment() {
+    // 先加载账号数据
+    await loadAccountsFromExcel();
+    
+    // 获取DOM元素
+    const payModal = document.getElementById('payModal');
+    const payClose = document.getElementById('payClose');
+    const paySubmit = document.getElementById('paySubmit');
+    const payAccount = document.getElementById('payAccount');
+    const payPassword = document.getElementById('payPassword');
+    const payRes = document.getElementById('payRes');
+    
+    // 绑定小规模纳税人缴税按钮
+    const applyTaxSmallBtn = document.getElementById('applyTaxSmall');
+    if (applyTaxSmallBtn) {
+        applyTaxSmallBtn.addEventListener('click', function() {
+            const totalTaxElement = document.getElementById('totalTax');
+            if (totalTaxElement) {
+                const totalTax = totalTaxElement.textContent;
+                if (totalTax && totalTax !== '0.00 元') {
+                    openPayModal(totalTax);
+                } else {
+                    alert('请先计算税费！');
+                }
+            }
+        });
+    }
+    
+    // 绑定关闭按钮
+    if (payClose) {
+        payClose.addEventListener('click', function() {
+            payModal.style.display = 'none';
+        });
+    }
+    
+    // 点击外部关闭弹窗
+    payModal.addEventListener('click', function(e) {
+        if (e.target === payModal) {
+            payModal.style.display = 'none';
+        }
+    });
+    
+    // 绑定支付提交按钮
+    paySubmit.addEventListener('click', function() {
+        const username = payAccount.value.trim();
+        const password = payPassword.value.trim();
+        
+        // 验证输入
+        if (!username || !password) {
+            showPaymentResult('账号和密码不能为空！', false);
+            return;
+        }
+        
+        // 验证账号密码
+        if (validateAccount(username, password)) {
+            showPaymentResult('✅ 支付成功！税款已成功缴纳。', true);
+            
+            // 3秒后自动关闭弹窗
+            setTimeout(() => {
+                payModal.style.display = 'none';
+                // 可选：清空输入框
+                payAccount.value = '';
+                payPassword.value = '';
+            }, 3000);
+        } else {
+            showPaymentResult('❌ 账号或密码错误！请检查后重试。', false);
+        }
+    });
+    
+    // 按Enter键提交
+    payPassword.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            paySubmit.click();
+        }
+    });
+}
+
+// 显示支付结果
+function showPaymentResult(message, isSuccess) {
+    const payRes = document.getElementById('payRes');
+    payRes.textContent = message;
+    payRes.style.color = isSuccess ? '#4CAF50' : '#F44336';
+    payRes.style.backgroundColor = isSuccess ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)';
+    payRes.style.display = 'block';
+    payRes.style.padding = '10px';
+    payRes.style.borderRadius = '5px';
+    payRes.style.marginTop = '15px';
+    payRes.style.textAlign = 'center';
+}
+
+// 页面加载完成后初始化支付功能
+document.addEventListener('DOMContentLoaded', function() {
+    initPayment();
+    
+    // 也可以添加其他支付按钮的绑定（如个人所得税的支付按钮）
+    // 示例：如果有个税支付按钮
+    // const applyTaxPersonalBtn = document.getElementById('applyTaxPersonal');
+    // if (applyTaxPersonalBtn) {
+    //     applyTaxPersonalBtn.addEventListener('click', function() {
+    //         const taxAmount = document.getElementById('monthlyTax').textContent;
+    //         if (taxAmount && taxAmount !== '0.00 元') {
+    //             openPayModal(taxAmount);
+    //         } else {
+    //             alert('请先计算个人所得税！');
+    //         }
+    //     });
+    // }
+});
+
+// ==================== 在现有的小规模纳税人计算函数中添加金额获取 ====================
+// 修改现有的小规模纳税人计算函数，确保税费金额可以正确获取
+document.getElementById('smallScaleCalc').onclick = function() {
+    const sales = parseFloat(document.getElementById('salesAmount').value) || 0;
+    const period = document.getElementById('taxPeriod').value;
+    const invoice = document.getElementById('invoiceType').value;
+    const vatRate = 0.01;
+    const exemption = period === 'month' ? 100000 : 300000;
+
+    const exSales = sales / (1 + vatRate);
+    let vat = 0;
+    if (invoice === 'special') {
+        vat = exSales * vatRate;
+    } else {
+        vat = exSales > exemption ? (exSales - exemption) * vatRate : 0;
+    }
+    
+    const addTax = vat * 0.12 * 0.5;
+    const totalTax = vat + addTax;
+
+    // 填充结果
+    document.getElementById('exSales').textContent = exSales.toFixed(2) + ' 元';
+    document.getElementById('vat').textContent = vat.toFixed(2) + ' 元';
+    document.getElementById('addTax').textContent = addTax.toFixed(2) + ' 元';
+    document.getElementById('totalTax').textContent = totalTax.toFixed(2) + ' 元';
+    
+    // 显示结果区域
+    document.getElementById('smallScaleResult').style.display = 'block';
+};
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'applyTaxSmall') {          // 小规模纳税人
+    const tax = document.getElementById('totalTax').textContent.replace(/[^\d.]/g, '');
+    openPayModal(tax);
+  }
+  if (e.target.id === 'applyTaxPersonal') {       // 个人所得税（如果以后加）
+    const tax = document.getElementById('monthlyTax').textContent.replace(/[^\d.]/g, '');
+    openPayModal(tax);
+  }
+});
+document.addEventListener('click', e => {
+  if (e.target.id === 'applyTaxSmall') {          // 小规模纳税人
+    const tax = document.getElementById('totalTax').textContent.replace(/[^\d.]/g, '');
+    openPayModal(tax);
+  }});
     </script>
+
 </body>
 </html>
