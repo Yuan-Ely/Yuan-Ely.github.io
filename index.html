@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dashu</title>
+    <style>
+      /* 重置默认样式 */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        min-height: 100vh;
+        background-image: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 20px;
+      }
+
+      /* 玻璃拟态效果的容器 */
+      .container {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        padding: 50px;
+        max-width: 600px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        animation: fadeIn 1s ease-out;
+      }
+
+      h1 {
+        font-size: 3em;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+        letter-spacing: 1px;
+      }
+
+      p {
+        font-size: 1.2em;
+        line-height: 1.6;
+        margin-bottom: 30px;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+      }
+
+      .btn {
+        display: inline-block;
+        padding: 12px 30px;
+        background: rgba(255, 255, 255, 0.25);
+        color: white;
+        text-decoration: none;
+        border-radius: 50px;
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        cursor: pointer;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.4);
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 2em;
+        }
+        
+        p {
+          font-size: 1em;
+        }
+        
+        .container {
+          padding: 30px;
+        }
+      }
+
+      /* 淡入动画 */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>大数据技术与财税政策分析小组作业</h1>
+      <p>面向小规模纳税人与个人报税的平台</p>
+      <button class="btn" onclick="window.location.href='main.html'">开始探索</button>
+    </div>
+  </body>
+</html>
